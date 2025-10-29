@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Products & Buyers — Search / Edit (Task 6)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root{
+        --bg:#f7fbff;
+        --card:#fff;
+        --muted:#6b7280;
+        --primary:#7c3aed;
+        --accent:#06b6d4;
+        --success:#10b981;
+        --danger:#ef4444;
+      }
+      *{box-sizing:border-box}
+      body{font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,var(--bg) 0%, #f1f8ff 100%);color:#0f172a;margin:0;padding:2rem}
+      .container{max-width:1200px;margin:0 auto}
+      header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem}
+      .title{display:flex;flex-direction:column}
+      h1{margin:0;font-size:1.5rem;color:var(--primary)}
+      p.lead{margin:0;color:var(--muted)}
+
+      .controls{background:var(--card);padding:1rem;border-radius:12px;box-shadow:0 6px 30px rgba(13,19,39,0.06);display:grid;grid-template-columns:1fr 200px 200px 140px;gap:0.75rem;align-items:center}
+      .controls input[type="search"],.controls select{padding:0.65rem 0.8rem;border-radius:8px;border:1px solid #e6eef7;background:#fbfeff}
+      .controls .btn{padding:0.65rem 0.9rem;border-radius:8px;border:none;cursor:pointer;font-weight:600}
+      .btn-primary{background:linear-gradient(90deg,var(--primary),#5b21b6);color:#fff}
+      .btn-ghost{background:transparent;border:1px solid #e6eef7}
+      .btn-danger{background:var(--danger);color:#fff}
+
+      .meta{display:flex;gap:0.75rem;align-items:center}
+
+      .results{margin-top:1rem}
+      table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:0 6px 30px rgba(13,19,39,0.06)}
+      thead th{background:linear-gradient(90deg,var(--primary),var(--accent));color:#fff;padding:0.85rem;text-align:left;font-size:0.85rem}
+      tbody td{padding:0.75rem;border-top:1px solid #f1f5f9;font-size:0.95rem;color:#0f172a}
+      tbody tr:hover{background:linear-gradient(90deg,rgba(12,74,110,0.02),transparent)}
+      .actions button{margin-right:0.45rem;padding:0.45rem 0.6rem;border-radius:8px;border:none;cursor:pointer}
+      .actions .edit{background:var(--success);color:#fff}
+      .actions .delete{background:var(--danger);color:#fff}
+
+      .message{padding:0.6rem 0.9rem;border-radius:8px;margin-top:0.85rem;display:none}
+      .message.success{background:rgba(16,185,129,0.12);color:var(--success);display:block}
+      .message.error{background:rgba(239,68,68,0.12);color:var(--danger);display:block}
+
+      /* modal */
+      .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:50}
+      .modal .panel{background:var(--card);width:100%;max-width:540px;border-radius:12px;padding:1rem 1.25rem}
+      .modal .panel h3{margin:0 0 0.5rem 0}
+      .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem}
+      .form-row .full{grid-column:1/-1}
+      label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.25rem}
+      input[type=text],input[type=number],select,textarea{width:100%;padding:0.6rem;border-radius:8px;border:1px solid #e6eef7}
+
+      .footer{margin-top:1rem;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.9rem}
+
+      mark{background:rgba(124,58,237,0.12);padding:0.05rem 0.18rem;border-radius:3px}
+
+      /* responsive */
+      @media(max-width:880px){
+        .controls{grid-template-columns:1fr 120px 120px;grid-auto-rows:auto}
+        .form-row{grid-template-columns:1fr}
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="title">
+          <h1>📦 Products & Buyers</h1>
+          <p class="lead">Search, filter, and update records. Edits are simulated (in-memory/localStorage).</p>
+        </div>
+        <div class="meta">
+          <button class="btn btn-ghost" id="togglePersist">Persist: Off</button>
+        </div>
+      </header>
+
+      <section class="controls" aria-label="search controls">
+        <input type="search" id="search" placeholder="Search by name, id, category, email, or location...">
+        <select id="typeSelect" aria-label="type">
+          <option value="products">Products</option>
+          <option value="buyers">Buyers</option>
+        </select>
+        <select id="filterSelect" aria-label="filter">
+          <option value="all">All</option>
+        </select>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+          <button class="btn btn-primary" id="newBtn">New</button>
+          <button class="btn btn-ghost" id="resetBtn">Reset</button>
+        </div>
+      </section>
+
+      <div class="results">
+        <div class="message success" id="msgSuccess"></div>
+        <div class="message error" id="msgError"></div>
+
+        <div id="tableWrap"></div>
+
+        <div class="footer">
+          <div id="countInfo"></div>
+          <div>
+            <button class="btn btn-ghost" id="prevPage">Prev</button>
+            <span id="pageInfo" style="margin:0 0.5rem"></span>
+            <button class="btn btn-ghost" id="nextPage">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal -->
+      <div class="modal" id="modal">
+        <div class="panel">
+          <button id="closeModal" style="float:right;border:none;background:none;font-size:1.2rem;cursor:pointer">✕</button>
+          <h3 id="modalTitle">Edit Record</h3>
+          <form id="editForm">
+            <input type="hidden" id="editId">
+            <input type="hidden" id="editType">
+            <div class="form-row">
+              <div>
+                <label for="editName">Name</label>
+                <input id="editName" type="text" required>
+              </div>
+              <div>
+                <label for="editIdDisplay">ID</label>
+                <input id="editIdDisplay" type="text" disabled>
+              </div>
+              <div class="full">
+                <label id="field1Label" for="field1">Category / Email</label>
+                <input id="field1" type="text">
+              </div>
+              <div class="full">
+                <label id="field2Label" for="field2">Price / Location</label>
+                <input id="field2" type="text">
+              </div>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+              <button class="btn btn-primary" type="submit">Save</button>
+              <button class="btn btn-ghost" type="button" id="cancelEdit">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Data & Persistence ---
+      const DEFAULT_PRODUCTS = [
+        {id:'P001', name:'Laptop Pro X', category:'Electronics', price:95000, location:'Mumbai'},
+        {id:'P002', name:'Cotton T-Shirt', category:'Clothing', price:800, location:'Delhi'},
+        {id:'P003', name:'Noise Cancelling Headphones', category:'Electronics', price:12000, location:'Bangalore'},
+        {id:'P004', name:'Running Shoes V2', category:'Footwear', price:4500, location:'Mumbai'}
+      ];
+      const DEFAULT_BUYERS = [
+        {id:'B101', name:'Amit Sharma', email:'amit@example.com', location:'Delhi', registration_date:'2024-01-15'},
+        {id:'B102', name:'Priya Singh', email:'priya@example.com', location:'Mumbai', registration_date:'2023-11-01'},
+        {id:'B103', name:'Rajesh Kumar', email:'rajesh@example.com', location:'Bangalore', registration_date:'2024-03-20'}
+      ];
+
+      let products = [];
+      let buyers = [];
+      const STORAGE_KEY = 'task6_data_v1';
+      let persist = false;
+
+      function loadData(){
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if(saved){
+          try{
+            const parsed = JSON.parse(saved);
+            products = parsed.products || DEFAULT_PRODUCTS.slice();
+            buyers = parsed.buyers || DEFAULT_BUYERS.slice();
+          }catch(e){ products = DEFAULT_PRODUCTS.slice(); buyers = DEFAULT_BUYERS.slice(); }
+        }else{ products = DEFAULT_PRODUCTS.slice(); buyers = DEFAULT_BUYERS.slice(); }
+      }
+      function saveData(){ if(!persist) return; localStorage.setItem(STORAGE_KEY, JSON.stringify({products,buyers})); }
+
+      // --- UI Refs ---
+      const $ = id => document.getElementById(id);
+      const search = $('search');
+      const typeSelect = $('typeSelect');
+      const filterSelect = $('filterSelect');
+      const tableWrap = $('tableWrap');
+      const msgSuccess = $('msgSuccess');
+      const msgError = $('msgError');
+      const modal = $('modal');
+      const modalTitle = $('modalTitle');
+      const editForm = $('editForm');
+      const editId = $('editId');
+      const editType = $('editType');
+      const editIdDisplay = $('editIdDisplay');
+      const editName = $('editName');
+      const field1 = $('field1');
+      const field1Label = $('field1Label');
+      const field2 = $('field2');
+      const field2Label = $('field2Label');
+      const prevPage = $('prevPage');
+      const nextPage = $('nextPage');
+      const pageInfo = $('pageInfo');
+      const countInfo = $('countInfo');
+      const resetBtn = $('resetBtn');
+      const togglePersist = $('togglePersist');
+      const newBtn = $('newBtn');
+
+      // --- State ---
+      let page = 1; const PAGE_SIZE = 6;
+
+      // --- Helpers ---
+      function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+      function showMessage(type, text){ if(type==='success'){ msgSuccess.textContent=text; msgSuccess.classList.add('success'); msgSuccess.style.display='block'; msgError.style.display='none'; setTimeout(()=>msgSuccess.style.display='none',4000);} else if(type==='error'){ msgError.textContent=text; msgError.style.display='block'; msgSuccess.style.display='none'; setTimeout(()=>msgError.style.display='none',5000);} else { msgError.style.display='none'; msgSuccess.style.display='none'; } }
+
+      function highlight(term, text){ if(!term) return escapeHtml(text); const t=term.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&'); return escapeHtml(text).replace(new RegExp(t,'ig'),m=>`<mark>${m}</mark>`); }
+      function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;'})[c]); }
+
+      // --- Filters + Rendering ---
+      function renderFilterOptions(){ const type = typeSelect.value; filterSelect.innerHTML=''; const optAll = new Option('All','all'); filterSelect.add(optAll); if(type==='products'){ const cats=[...new Set(products.map(p=>p.category))].sort(); cats.forEach(c=>filterSelect.add(new Option(c,c))); } else { const locs=[...new Set(buyers.map(b=>b.location))].sort(); locs.forEach(l=>filterSelect.add(new Option(l,l))); } }
+
+      function getFiltered(){ const q=search.value.trim().toLowerCase(); const type = typeSelect.value; const filt = filterSelect.value; let list = type==='products'?products:buyers; let filtered = list.filter(item=>{ const values = Object.values(item).map(v=>String(v).toLowerCase()); const matchSearch = q.length===0 || values.some(v=>v.includes(q)); let matchFilter = filt==='all' || (type==='products'? item.category===filt : item.location===filt); return matchSearch && matchFilter; }); return filtered; }
+
+      function renderTable(){ const type = typeSelect.value; const data = getFiltered(); const total = data.length; const pages = Math.max(1, Math.ceil(total / PAGE_SIZE)); if(page>pages) page=pages; const start=(page-1)*PAGE_SIZE; const pageData = data.slice(start,start+PAGE_SIZE);
+        if(total===0){ tableWrap.innerHTML=`<p style="padding:1rem;background:var(--card);border-radius:8px">No records found.</p>`; countInfo.textContent='0 results'; pageInfo.textContent=''; return; }
+
+        // Build table
+        let html = '<table><thead><tr>';
+        if(type==='products'){ html += '<th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Location</th><th>Actions</th>'; }
+        else { html += '<th>ID</th><th>Name</th><th>Email</th><th>Location</th><th>Reg. Date</th><th>Actions</th>'; }
+        html += '</tr></thead><tbody>';
+
+        const q = search.value.trim();
+        pageData.forEach(item=>{
+          html += '<tr>';
+          html += `<td>${escapeHtml(item.id)}</td>`;
+          html += `<td>${highlight(q,item.name)}</td>`;
+          if(type==='products'){
+            html += `<td>${highlight(q,item.category)}</td>`;
+            html += `<td>₹${Number(item.price).toLocaleString('en-IN')}</td>`;
+            html += `<td>${highlight(q,item.location)}</td>`;
+          } else {
+            html += `<td>${highlight(q,item.email)}</td>`;
+            html += `<td>${highlight(q,item.location)}</td>`;
+            html += `<td>${escapeHtml(item.registration_date||'')}</td>`;
+          }
+          html += `<td class="actions"><button class="edit" data-id="${item.id}" data-type="${type}">Edit</button><button class="delete" data-id="${item.id}" data-type="${type}">Delete</button></td>`;
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        tableWrap.innerHTML = html;
+        countInfo.textContent = `${total} result${total!==1?'s':''}`;
+        pageInfo.textContent = `Page ${page} of ${pages}`;
+
+        // attach events
+        tableWrap.querySelectorAll('.edit').forEach(btn=>btn.addEventListener('click', e=>openEdit(e.currentTarget.dataset.id, e.currentTarget.dataset.type)));
+        tableWrap.querySelectorAll('.delete').forEach(btn=>btn.addEventListener('click', e=>handleDelete(e.currentTarget.dataset.id, e.currentTarget.dataset.type)));
+      }
+
+      // --- Edit / New ---
+      function openEdit(id,type){ const record = (type==='products'? products.find(p=>p.id===id) : buyers.find(b=>b.id===id)); if(!record) return; editId.value = id; editType.value = type; editIdDisplay.value=record.id; editName.value=record.name || '';
+        if(type==='products'){ field1Label.textContent='Category'; field1.value = record.category || ''; field1.disabled=false; field2Label.textContent='Price (₹)'; field2.value = record.price || ''; field2.type='number'; }
+        else { field1Label.textContent='Email (Read-only)'; field1.value = record.email || ''; field1.disabled=true; field2Label.textContent='Location'; field2.value = record.location || ''; field2.type='text'; }
+        modal.style.display='flex'; modal.scrollTop=0; modalTitle.textContent = `Edit ${type.slice(0,-1)} — ${id}`;
+      }
+
+      function openNew(){ editId.value = ''; editType.value = typeSelect.value; editIdDisplay.value = 'Auto'; editName.value=''; field1.value=''; field1.disabled=false; field2.value=''; field2.type = typeSelect.value==='products' ? 'number':'text'; field1Label.textContent = typeSelect.value==='products' ? 'Category' : 'Email'; field2Label.textContent = typeSelect.value==='products' ? 'Price (₹)' : 'Location'; modal.style.display='flex'; modalTitle.textContent='New Record'; }
+
+      function closeModal(){ modal.style.display='none'; }
+
+      editForm.addEventListener('submit', function(e){ e.preventDefault(); const id = editId.value || generateId(editType.value); const type = editType.value || typeSelect.value; const name = editName.value.trim(); if(!name){ showMessage('error','Name cannot be empty'); return; }
+        if(type==='products'){ const cat = field1.value.trim(); const price = Number(field2.value); if(!cat){ showMessage('error','Category is required'); return; } if(isNaN(price) || price<=0){ showMessage('error','Price must be a positive number'); return; } const idx = products.findIndex(p=>p.id===id); if(idx>=0){ products[idx].name=name; products[idx].category=cat; products[idx].price=price; } else { products.unshift({id,name,category:cat,price,location:field2.value||'Unknown'}); }
+        } else { const email = field1.value.trim(); const loc = field2.value.trim(); if(!loc){ showMessage('error','Location is required'); return; } const idx = buyers.findIndex(b=>b.id===id); if(idx>=0){ buyers[idx].name=name; buyers[idx].location=loc; } else { buyers.unshift({id,name,email:email||'unknown@example.com',location:loc,registration_date:new Date().toISOString().slice(0,10)}); } }
+        saveData(); closeModal(); renderFilterOptions(); renderTable(); showMessage('success','Saved successfully'); });
+
+      function generateId(type){ const prefix = type==='products' ? 'P' : 'B'; const base = (type==='products'?products:buyers).length+1; return prefix + String(100+base).slice(1); }
+
+      function handleDelete(id,type){ if(!confirm('Delete is simulated and will permanently remove this item in-memory. Continue?')) return; if(type==='products'){ products = products.filter(p=>p.id!==id); } else { buyers = buyers.filter(b=>b.id!==id); } saveData(); renderFilterOptions(); renderTable(); showMessage('success','Deleted (simulated)'); }
+
+      // --- Events ---
+      search.addEventListener('input', debounce(()=>{ page=1; renderTable(); },250));
+      typeSelect.addEventListener('change', ()=>{ renderFilterOptions(); page=1; renderTable(); });
+      filterSelect.addEventListener('change', ()=>{ page=1; renderTable(); });
+      prevPage.addEventListener('click', ()=>{ if(page>1){ page--; renderTable(); }});
+      nextPage.addEventListener('click', ()=>{ const total=getFiltered().length; const pages=Math.max(1,Math.ceil(total/PAGE_SIZE)); if(page<pages){ page++; renderTable(); }});
+      resetBtn.addEventListener('click', ()=>{ search.value=''; typeSelect.value='products'; renderFilterOptions(); page=1; renderTable(); showMessage(); });
+      $('closeModal').addEventListener('click', closeModal); $('cancelEdit').addEventListener('click', closeModal); newBtn.addEventListener('click', openNew);
+
+      togglePersist.addEventListener('click', ()=>{ persist = !persist; togglePersist.textContent = `Persist: ${persist? 'On':'Off'}`; if(persist) saveData(); });
+
+      // --- Init ---
+      loadData(); renderFilterOptions(); renderTable();
+
+      // expose for quick console tests
+      window._app = { products, buyers, renderTable };
+    </script>
+  </body>
+</html>
